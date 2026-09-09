@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Polymer Quiz — เล่น</title>
+<script src="https://cdn.tailwindcss.com/3.4.17"></script>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Thai:wght@400;600;700;800&display=swap" rel="stylesheet">
+<style>
+  body { font-family: 'Noto Sans Thai', sans-serif; background: #f0f4f8; }
+  .opt-btn { transition: all 0.15s ease; border: 2.5px solid #d1dde8; }
+  .opt-btn:hover:not(:disabled) { border-color: #4ad9e8; background: #f0fdff; transform: translateY(-2px); }
+  .opt-btn.selected { border-color: #4ad9e8; background: #e0fbff; }
+  .opt-btn.correct { border-color: #16a34a; background: #dcfce7; }
+  .opt-btn.incorrect { border-color: #dc2626; background: #fee2e2; }
+  .opt-btn:disabled { cursor: default; }
+  .timer-bar { transition: width 1s linear; }
+  @keyframes pop { 0%{transform:scale(0.8);opacity:0} 100%{transform:scale(1);opacity:1} }
+  .pop { animation: pop 0.3s ease both; }
+  @keyframes slide-up { from{opacity:0;transform:translateY(16px)} to{opacity:1;transform:translateY(0)} }
+  .slide-up { animation: slide-up 0.35s ease both; }
+</style>
+</head>
+<body class="min-h-screen flex flex-col">
+
+<!-- JOIN SCREEN -->
+<div id="join-screen" class="flex-1 flex flex-col items-center justify-center px-6 py-12 min-h-screen">
+  <div class="w-full max-w-sm">
+    <div class="text-center mb-8">
+      <div class="text-6xl mb-3">🧪</div>
+      <h1 class="text-2xl font-extrabold text-[#0b1f3a]">Polymer Quiz</h1>
+      <p class="text-gray-500 mt-1">เข้าร่วมเกมของครู</p>
+    </div>
+    <div class="bg-white rounded-3xl shadow-xl p-8 space-y-4">
+      <div>
+        <label class="block text-sm font-bold text-gray-700 mb-1">Room Code</label>
+        <input id="room-input" type="text" maxlength="4" placeholder="1234"
+          class="w-full text-center text-4xl font-black tracking-widest border-2 border-gray-200 rounded-2xl py-4 focus:outline-none focus:border-[#4ad9e8] uppercase"
+          oninput="this.value=this.value.replace(/[^0-9]/g,'')">
+      </div>
+      <div>
+        <label class="block text-sm font-bold text-gray-700 mb-1">ชื่อของคุณ</label>
+        <input id="name-input" type="text" maxlength="20" placeholder="พิมพ์ชื่อ..."
+          class="w-full text-center text-xl font-bold border-2 border-gray-200 rounded-2xl py-3 focus:outline-none focus:border-[#4ad9e8]">
+      </div>
+      <p id="join-error" class="text-red-500 text-sm text-center hidden"></p>
+      <button onclick="joinRoom()" class="w-full bg-[#0b1f3a] hover:bg-[#1a3a5c] text-white font-extrabold text-xl py-4 rounded-2xl transition">
+        เข้าร่วม 🚀
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- WAITING SCREEN -->
+<div id="wait-screen" class="hidden flex-1 flex flex-col items-center justify-center px-6 py-12 min-h-screen">
+  <div class="text-center pop">
+    <div class="text-6xl mb-4">⏳</div>
+    <h2 class="text-2xl font-extrabold text-[#0b1f3a]" id="wait-name"></h2>
+    <p class="text-gray-500 mt-2">รอครูเริ่มเกม...</p>
+    <div class="mt-6 flex gap-2 justify-center">
+      <div class="w-3 h-3 bg-[#4ad9e8] rounded-full animate-bounce" style="animation-delay:0s"></div>
+      <div class="w-3 h-3 bg-[#4ad9e8] rounded-full animate-bounce" style="animation-delay:0.15s"></div>
+      <div class="w-3 h-3 bg-[#4ad9e8] rounded-full animate-bounce" style="animation-delay:0.3s"></div>
+    </div>
+  </div>
+</div>
+
+<!-- QUESTION SCREEN -->
+<div id="question-screen" class="hidden flex-col min-h-screen">
+  <!-- timer bar -->
+  <div class="w-full h-2 bg-gray-200">
+    <div id="p-timer-bar" class="timer-bar h-full bg-[#4ad9e8]" style="width:100%"></div>
+  </div>
+  <div class="flex-1 max-w-lg mx-auto w-full px-4 py-6 flex flex-col gap-4">
+    <div class="flex items-center justify-between">
+      <span id="p-q-num" class="text-sm font-bold text-gray-400"></span>
+      <span id="p-timer" class="text-3xl font-black text-[#0b1f3a]"></span>
+    </div>
+    <div class="bg-white rounded-3xl shadow-lg p-6">
+      <p id="p-q-text" class="text-lg font-bold text-[#0b1f3a] leading-snug"></p>
+    </div>
+    <div id="p-options" class="grid gap-3"></div>
+    <p id="p-feedback" class="text-center font-bold text-lg hidden"></p>
+  </div>
+</div>
+
+<!-- LEADERBOARD SCREEN -->
+<div id="lb-screen" class="hidden flex-col min-h-screen">
+  <div class="bg-[#0b1f3a] text-white px-6 py-5 text-center">
+    <p class="text-xs font-bold tracking-widest text-[#8eeef5] uppercase mb-1">Leaderboard</p>
+    <h2 class="text-xl font-extrabold">อันดับหลังข้อที่ <span id="lb-qnum"></span></h2>
+  </div>
+  <div class="max-w-lg mx-auto w-full px-4 py-6 space-y-3" id="lb-list"></div>
+  <p class="text-center text-gray-400 text-sm pb-6">รอครูเริ่มข้อถัดไป...</p>
+</div>
+
+<!-- END SCREEN -->
+<div id="end-screen" class="hidden flex-1 flex flex-col items-center justify-center px-6 py-12 min-h-screen">
+  <div class="text-center pop w-full max-w-sm">
+    <div class="text-6xl mb-4">🎊</div>
+    <h2 class="text-2xl font-extrabold text-[#0b1f3a] mb-1">จบเกมแล้ว!</h2>
+    <p class="text-gray-500 mb-6">ผลคะแนนสุดท้าย</p>
+    <div id="end-lb" class="space-y-2 text-left bg-white rounded-3xl shadow-xl p-6"></div>
+    <div class="mt-6 bg-[#dff8fb] rounded-2xl p-4">
+      <p class="text-sm font-bold text-[#087d91]">คะแนนของคุณ</p>
+      <p class="text-4xl font-black text-[#0b1f3a]" id="my-score">0</p>
+    </div>
+  </div>
+</div>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+import { getDatabase, ref, set, update, onValue, get } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyCRJX6shbtK3T2bN2udnFYGlfyvLSyKOZQ",
+  authDomain: "polymer-quiz-bf939.firebaseapp.com",
+  databaseURL: "https://polymer-quiz-bf939-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId: "polymer-quiz-bf939",
+  storageBucket: "polymer-quiz-bf939.firebasestorage.app",
+  messagingSenderId: "431759189206",
+  appId: "1:431759189206:web:364dc26a7c7257dfdb9577"
+};
+
+const app = initializeApp(firebaseConfig);
+const db = getDatabase(app);
+
+let roomCode = "";
+let playerName = "";
+let joinTime = 0;
+let questionStart = 0;
+let answered = false;
+let timerInterval = null;
+let myScore = 0;
+
+// Auto-fill room code from URL
+const params = new URLSearchParams(location.search);
+if (params.get('room')) {
+  document.getElementById('room-input').value = params.get('room');
+}
+
+function show(id) {
+  ['join-screen','wait-screen','question-screen','lb-screen','end-screen'].forEach(s => {
+    const el = document.getElementById(s);
+    el.classList.add('hidden');
+    el.classList.remove('flex');
+  });
+  const target = document.getElementById(id);
+  target.classList.remove('hidden');
+  target.classList.add('flex');
+}
+
+window.joinRoom = async function() {
+  const code = document.getElementById('room-input').value.trim();
+  const name = document.getElementById('name-input').value.trim();
+  const errEl = document.getElementById('join-error');
+  errEl.classList.add('hidden');
+
+  if (!code || code.length !== 4) { errEl.textContent = 'กรุณากรอก Room Code 4 หลัก'; errEl.classList.remove('hidden'); return; }
+  if (!name) { errEl.textContent = 'กรุณาใส่ชื่อ'; errEl.classList.remove('hidden'); return; }
+
+  const snap = await get(ref(db, `rooms/${code}`));
+  if (!snap.exists()) { errEl.textContent = 'ไม่พบห้องนี้ ตรวจสอบ Room Code'; errEl.classList.remove('hidden'); return; }
+
+  roomCode = code;
+  playerName = name;
+
+  await set(ref(db, `rooms/${roomCode}/players/${playerName}`), { joined: Date.now() });
+  document.getElementById('wait-name').textContent = `สวัสดี ${playerName}! 👋`;
+  show('wait-screen');
+
+  // Listen to room state
+  onValue(ref(db, `rooms/${roomCode}`), snap => {
+    const room = snap.val();
+    if (!room) return;
+
+    if (room.status === 'waiting') {
+      show('wait-screen');
+    } else if (room.status === 'question') {
+      handleQuestion(room);
+    } else if (room.status === 'reveal') {
+      handleReveal(room);
+    } else if (room.status === 'ended') {
+      handleEnd();
+    }
+  });
+
+  onValue(ref(db, `rooms/${roomCode}/scores`), snap => {
+    const scores = snap.val() || {};
+    myScore = scores[playerName] || 0;
+    document.getElementById('my-score').textContent = myScore;
+  });
+};
+
+let lastQ = -1;
+function handleQuestion(room) {
+  if (room.currentQ === lastQ) {
+    // just update timer
+    updateTimer(room.timeLeft, room.timer || 20);
+    return;
+  }
+  lastQ = room.currentQ;
+  answered = false;
+  questionStart = Date.now();
+  clearInterval(timerInterval);
+
+  show('question-screen');
+  document.getElementById('p-q-num').textContent = `ข้อที่ ${room.currentQ+1} / ${room.questions}`;
+  document.getElementById('p-q-text').textContent = room.questionText;
+  document.getElementById('p-feedback').classList.add('hidden');
+
+  const opts = room.options || [];
+  document.getElementById('p-options').innerHTML = opts.map((opt, i) => `
+    <button class="opt-btn w-full text-left bg-white rounded-2xl px-5 py-4 font-medium text-[#183b56] slide-up" style="animation-delay:${i*0.07}s"
+      onclick="selectAnswer(${i})">
+      <span class="font-bold text-gray-400 mr-2">${['ก','ข','ค','ง'][i]}.</span>${opt}
+    </button>`).join('');
+
+  updateTimer(room.timeLeft || room.timer || 20, room.timer || 20);
+}
+
+function updateTimer(left, total) {
+  document.getElementById('p-timer').textContent = left;
+  document.getElementById('p-timer-bar').style.width = `${(left/total)*100}%`;
+}
+
+function handleReveal(room) {
+  clearInterval(timerInterval);
+  if (room.answer === undefined || room.answer === -1) return;
+
+  const btns = document.querySelectorAll('#p-options .opt-btn');
+  btns.forEach((btn, i) => {
+    btn.disabled = true;
+    if (i === room.answer) btn.classList.add('correct');
+  });
+  const fb = document.getElementById('p-feedback');
+  const myAnsEl = document.querySelector('#p-options .opt-btn.selected');
+  if (myAnsEl) {
+    const myIdx = Array.from(document.querySelectorAll('#p-options .opt-btn')).indexOf(myAnsEl);
+    if (myIdx === room.answer) {
+      fb.textContent = '✅ ถูกต้อง! +คะแนน';
+      fb.className = 'text-center font-bold text-lg text-green-600';
+    } else {
+      myAnsEl.classList.add('incorrect');
+      fb.textContent = '❌ ผิด';
+      fb.className = 'text-center font-bold text-lg text-red-500';
+    }
+  } else {
+    fb.textContent = '⏰ หมดเวลา';
+    fb.className = 'text-center font-bold text-lg text-gray-400';
+  }
+  fb.classList.remove('hidden');
+
+  // Show leaderboard after 2s
+  setTimeout(() => showLeaderboard(room.currentQ + 1), 2000);
+}
+
+async function showLeaderboard(qNum) {
+  const snap = await get(ref(db, `rooms/${roomCode}/scores`));
+  const scores = snap.val() || {};
+  const sorted = Object.entries(scores).sort((a,b) => b[1]-a[1]);
+
+  document.getElementById('lb-qnum').textContent = qNum;
+  document.getElementById('lb-list').innerHTML = sorted.map(([name, score], i) => `
+    <div class="flex items-center gap-3 px-4 py-3 rounded-xl ${name===playerName?'bg-[#dff8fb] border-2 border-[#4ad9e8]':i===0?'bg-yellow-50 border border-yellow-200':'bg-white border border-gray-100'}">
+      <span class="text-xl font-black w-7 text-center">${i===0?'🥇':i===1?'🥈':i===2?'🥉':i+1}</span>
+      <span class="flex-1 font-bold text-gray-800 truncate">${name}${name===playerName?' 👈':''}</span>
+      <span class="font-black text-[#0b1f3a] text-lg">${score}</span>
+    </div>`).join('');
+
+  show('lb-screen');
+}
+
+async function handleEnd() {
+  clearInterval(timerInterval);
+  const snap = await get(ref(db, `rooms/${roomCode}/scores`));
+  const scores = snap.val() || {};
+  const sorted = Object.entries(scores).sort((a,b) => b[1]-a[1]);
+
+  document.getElementById('end-lb').innerHTML = sorted.map(([name, score], i) => `
+    <div class="flex items-center gap-3 px-4 py-3 rounded-xl ${name===playerName?'bg-[#dff8fb] border-2 border-[#4ad9e8]':'bg-gray-50 border border-gray-100'}">
+      <span class="text-xl font-black w-7">${i===0?'🥇':i===1?'🥈':i===2?'🥉':i+1}</span>
+      <span class="flex-1 font-bold truncate">${name}${name===playerName?' 👈':''}</span>
+      <span class="font-black text-[#0b1f3a]">${score}</span>
+    </div>`).join('');
+
+  document.getElementById('my-score').textContent = scores[playerName] || 0;
+  show('end-screen');
+}
+
+window.selectAnswer = async function(idx) {
+  if (answered) return;
+  answered = true;
+  const elapsed = (Date.now() - questionStart) / 1000;
+
+  document.querySelectorAll('#p-options .opt-btn').forEach((btn, i) => {
+    btn.disabled = true;
+    if (i === idx) btn.classList.add('selected');
+  });
+
+  await set(ref(db, `rooms/${roomCode}/answers/${playerName}`), {
+    ans: idx,
+    time: Math.round(elapsed)
+  });
+};
+</script>
+</body>
+</html>
