@@ -1,0 +1,350 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Polymer Quiz — Host</title>
+<script src="https://cdn.tailwindcss.com/3.4.17"></script>
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+import { getDatabase, ref, set, onValue, update, remove } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyCRJX6shbtK3T2bN2udnFYGlfyvLSyKOZQ",
+  authDomain: "polymer-quiz-bf939.firebaseapp.com",
+  databaseURL: "https://polymer-quiz-bf939-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId: "polymer-quiz-bf939",
+  storageBucket: "polymer-quiz-bf939.firebasestorage.app",
+  messagingSenderId: "431759189206",
+  appId: "1:431759189206:web:364dc26a7c7257dfdb9577"
+};
+
+const app = initializeApp(firebaseConfig);
+const db = getDatabase(app);
+
+const QUESTIONS = [
+  { q:"ข้อใดอธิบายความหมายของ "พอลิเมอร์" ได้ถูกต้องที่สุด", options:["สารประกอบที่มีโมเลกุลขนาดเล็กเพียงชนิดเดียว","สารที่มีโมเลกุลขนาดใหญ่ เกิดจากหน่วยย่อยต่อกันจำนวนมาก","ธาตุที่เกิดจากการรวมตัวของโลหะ","สารละลายที่มีน้ำเป็นตัวทำละลายเสมอ"], answer:1 },
+  { q:"ข้อใดเป็นพอลิเมอร์ธรรมชาติ", options:["พอลิเอทิลีน","พอลิไวนิลคลอไรด์","เซลลูโลส","พอลิสไตรีน"], answer:2 },
+  { q:"มอนอเมอร์ที่ใช้ผลิตพอลิเอทิลีน (PE) คือข้อใด", options:["เอทีน","โพรพีน","ไวนิลคลอไรด์","สไตรีน"], answer:0 },
+  { q:"ข้อใดเป็นสมบัติเด่นของเทอร์มอพลาสติก", options:["เมื่อร้อนแล้วไม่สามารถเปลี่ยนรูปร่างได้","เมื่อได้รับความร้อนจะอ่อนตัวและนำมาขึ้นรูปใหม่ได้","มีโครงสร้างร่างแหสามมิติเสมอ","ละลายน้ำได้ดีทุกชนิด"], answer:1 },
+  { q:"ผลิตภัณฑ์ข้อใดมักทำจากพอลิไวนิลคลอไรด์ (PVC)", options:["ขวดน้ำดื่มใส","ภาชนะโฟมใส่อาหาร","ท่อประปาพลาสติก","เส้นใยไหมธรรมชาติ"], answer:2 },
+  { q:"ข้อใดเป็นพอลิเมอร์สังเคราะห์ทั้งหมด", options:["พอลิเอทิลีน และไนลอน","แป้ง และเซลลูโลส","โปรตีน และยางธรรมชาติ","ดีเอ็นเอ และไหม"], answer:0 },
+  { q:"มอนอเมอร์ที่ใช้ผลิตพอลิโพรพิลีน (PP) คือข้อใด", options:["เอทีน","โพรพีน","สไตรีน","กลูโคส"], answer:1 },
+  { q:"ข้อใดเป็นลักษณะสำคัญของพลาสติกเทอร์มอเซต", options:["หลอมและขึ้นรูปใหม่ได้หลายครั้ง","อ่อนตัวง่ายเมื่อได้รับความร้อน","ใช้ทำถุงหูหิ้วเป็นหลัก","มีโครงสร้างเชื่อมโยงกันและไม่หลอมเหลวเมื่อแข็งตัวแล้ว"], answer:3 },
+  { q:"ข้อใดมักทำจากพอลิสไตรีน (PS)", options:["กล่องโฟมบรรจุอาหาร","ท่อน้ำประปา","ยางรถยนต์","เสื้อผ้าฝ้าย"], answer:0 },
+  { q:"หน่วยย่อยของแป้งและเซลลูโลสคือสารใด", options:["กรดอะมิโน","กลูโคส","เอทีน","กลีเซอรอล"], answer:1 },
+  { q:"สมบัติเด่นของยางธรรมชาติคือข้อใด", options:["แข็งและเปราะมาก","นำไฟฟ้าได้ดี","ยืดหยุ่นและกลับคืนสู่รูปร่างเดิมได้","ละลายน้ำได้ง่าย"], answer:2 },
+  { q:"การรวมตัวของมอนอเมอร์จำนวนมากให้เป็นพอลิเมอร์เรียกว่าอะไร", options:["การกลั่น","พอลิเมอไรเซชัน","การระเหย","การตกผลึก"], answer:1 },
+  { q:"พลาสติกชนิดใดเหมาะกับการหลอมเพื่อนำกลับมาใช้ใหม่มากที่สุด", options:["เทอร์มอเซต","ยางวัลคาไนซ์","เมลามีน","เทอร์มอพลาสติก"], answer:3 },
+  { q:"พอลิเมอร์ที่เกิดจากมอนอเมอร์ชนิดเดียวเรียกว่าอะไร", options:["โฮโมพอลิเมอร์","โคพอลิเมอร์","พอลิเมอร์ผสม","มอนอเมอร์คู่"], answer:0 },
+  { q:"แนวทางใดช่วยลดปัญหาขยะพลาสติกได้ดีที่สุด", options:["ใช้พลาสติกครั้งเดียวแล้วทิ้งให้มากขึ้น","ลดการใช้ ใช้ซ้ำ และคัดแยกเพื่อรีไซเคิล","เผาพลาสติกทุกชนิดในที่โล่ง","ทิ้งพลาสติกลงแม่น้ำเพื่อกำจัด"], answer:1 }
+];
+
+let roomCode = "";
+let timerSeconds = 20;
+let timerInterval = null;
+let currentQ = -1;
+let players = {};
+let answers = {};
+
+function genCode() {
+  return Math.floor(1000 + Math.random() * 9000).toString();
+}
+
+function $(id) { return document.getElementById(id); }
+
+function renderLeaderboard(scores) {
+  const sorted = Object.entries(scores || {}).sort((a,b) => b[1]-a[1]).slice(0,10);
+  return sorted.length === 0
+    ? '<p class="text-gray-400 text-center py-4">ยังไม่มีคะแนน</p>'
+    : sorted.map(([ name, score], i) => `
+      <div class="flex items-center gap-3 px-4 py-3 rounded-xl ${i===0?'bg-yellow-50 border border-yellow-200':i===1?'bg-gray-50 border border-gray-200':i===2?'bg-orange-50 border border-orange-200':'bg-white border border-gray-100'}">
+        <span class="text-xl font-black w-7 text-center ${i===0?'text-yellow-500':i===1?'text-gray-400':i===2?'text-orange-400':'text-gray-300'}">${i===0?'🥇':i===1?'🥈':i===2?'🥉':i+1}</span>
+        <span class="flex-1 font-bold text-gray-800 truncate">${name}</span>
+        <span class="font-black text-[#0b1f3a] text-lg">${score}</span>
+      </div>`).join('');
+}
+
+function renderAnswerStats() {
+  if (currentQ < 0) return '';
+  const q = QUESTIONS[currentQ];
+  const counts = [0,0,0,0];
+  Object.values(answers).forEach(a => { if (a >= 0 && a < 4) counts[a]++; });
+  const total = Object.values(answers).length || 1;
+  return q.options.map((opt, i) => `
+    <div class="flex items-center gap-2 mb-2">
+      <span class="w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${i===q.answer?'bg-green-500 text-white':'bg-gray-200 text-gray-600'}">${['ก','ข','ค','ง'][i]}</span>
+      <div class="flex-1 bg-gray-100 rounded-full h-5 overflow-hidden">
+        <div class="h-full rounded-full ${i===q.answer?'bg-green-400':'bg-blue-300'} transition-all" style="width:${Math.round(counts[i]/total*100)}%"></div>
+      </div>
+      <span class="text-sm font-bold w-8 text-right">${counts[i]}</span>
+    </div>`).join('');
+}
+
+async function createRoom() {
+  roomCode = genCode();
+  timerSeconds = parseInt($('timer-select').value);
+  await remove(ref(db, `rooms/${roomCode}`));
+  await set(ref(db, `rooms/${roomCode}`), {
+    status: 'waiting',
+    currentQ: -1,
+    timer: timerSeconds,
+    questions: QUESTIONS.length
+  });
+
+  $('setup-panel').classList.add('hidden');
+  $('room-panel').classList.remove('hidden');
+  $('room-code-display').textContent = roomCode;
+
+  const playUrl = `${location.origin}/play.html?room=${roomCode}`;
+  $('play-link').textContent = playUrl;
+  $('play-link').href = playUrl;
+
+  // Listen players
+  onValue(ref(db, `rooms/${roomCode}/players`), snap => {
+    players = snap.val() || {};
+    $('player-count').textContent = Object.keys(players).length;
+    $('player-list').innerHTML = Object.keys(players).map(name =>
+      `<span class="px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-sm font-medium">${name}</span>`
+    ).join('');
+  });
+
+  // Listen answers live
+  onValue(ref(db, `rooms/${roomCode}/answers`), snap => {
+    answers = snap.val() || {};
+    if (currentQ >= 0) {
+      $('answer-count').textContent = `ตอบแล้ว ${Object.keys(answers).length} / ${Object.keys(players).length} คน`;
+      $('answer-stats').innerHTML = renderAnswerStats();
+    }
+  });
+
+  // Listen scores for leaderboard
+  onValue(ref(db, `rooms/${roomCode}/scores`), snap => {
+    $('leaderboard').innerHTML = renderLeaderboard(snap.val());
+  });
+}
+
+async function startQuestion() {
+  if (currentQ >= QUESTIONS.length - 1) return endGame();
+  currentQ++;
+  answers = {};
+
+  const q = QUESTIONS[currentQ];
+  await update(ref(db, `rooms/${roomCode}`), {
+    status: 'question',
+    currentQ,
+    questionText: q.q,
+    options: q.options,
+    answer: -1,  // hide answer
+    timeLeft: timerSeconds,
+    answered: null
+  });
+  await remove(ref(db, `rooms/${roomCode}/answers`));
+
+  $('start-btn').disabled = true;
+  $('next-btn').disabled = true;
+  $('q-panel').classList.remove('hidden');
+  $('q-number').textContent = `ข้อที่ ${currentQ+1} / ${QUESTIONS.length}`;
+  $('q-text').textContent = q.q;
+  $('q-options').innerHTML = q.options.map((opt, i) =>
+    `<div class="flex gap-2 items-start px-4 py-3 rounded-xl border ${i===q.answer?'border-green-400 bg-green-50':'border-gray-200 bg-white'}">
+      <span class="font-bold text-gray-500 w-5">${['ก','ข','ค','ง'][i]}.</span>
+      <span class="${i===q.answer?'font-bold text-green-700':'text-gray-700'}">${opt}</span>
+    </div>`
+  ).join('');
+  $('answer-count').textContent = `ตอบแล้ว 0 / ${Object.keys(players).length} คน`;
+  $('answer-stats').innerHTML = '';
+
+  // Timer countdown
+  let left = timerSeconds;
+  $('timer-bar').style.width = '100%';
+  $('timer-text').textContent = left;
+  clearInterval(timerInterval);
+  timerInterval = setInterval(async () => {
+    left--;
+    $('timer-text').textContent = left;
+    $('timer-bar').style.width = `${(left/timerSeconds)*100}%`;
+    await update(ref(db, `rooms/${roomCode}`), { timeLeft: left });
+    if (left <= 0) {
+      clearInterval(timerInterval);
+      await revealAnswer();
+    }
+  }, 1000);
+}
+
+async function revealAnswer() {
+  clearInterval(timerInterval);
+  const q = QUESTIONS[currentQ];
+  await update(ref(db, `rooms/${roomCode}`), {
+    status: 'reveal',
+    answer: q.answer,
+    timeLeft: 0
+  });
+  // Score
+  const snapAnswers = answers;
+  const now = Date.now();
+  const updates = {};
+  for (const [player, data] of Object.entries(snapAnswers)) {
+    if (data.ans === q.answer) {
+      const timeFactor = Math.max(0, (timerSeconds - (data.time||timerSeconds)) / timerSeconds);
+      const pts = Math.round(500 + 500 * timeFactor);
+      updates[`rooms/${roomCode}/scores/${player}`] = (players[player]?.score || 0) + pts;
+    }
+  }
+  if (Object.keys(updates).length) await update(ref(db), updates);
+
+  $('next-btn').disabled = false;
+  $('answer-stats').innerHTML = renderAnswerStats();
+}
+
+async function endGame() {
+  clearInterval(timerInterval);
+  await update(ref(db, `rooms/${roomCode}`), { status: 'ended' });
+  $('q-panel').classList.add('hidden');
+  $('end-panel').classList.remove('hidden');
+}
+
+window.createRoom = createRoom;
+window.startQuestion = startQuestion;
+window.revealAnswer = revealAnswer;
+window.endGame = endGame;
+
+// Store answers with timestamp
+onValue(ref(db, 'rooms'), () => {});  // keep connection
+
+window.addEventListener('load', () => {
+  // intercept answer writes to capture time
+  onValue(ref(db, 'rooms'), snap => {
+    const rooms = snap.val() || {};
+    for (const [code, room] of Object.entries(rooms)) {
+      if (room.status === 'question' && code === roomCode) {
+        // handled per room
+      }
+    }
+  });
+});
+</script>
+<style>
+  body { font-family: 'Noto Sans Thai', sans-serif; background: #f0f4f8; }
+  .timer-bar { transition: width 1s linear; }
+</style>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Thai:wght@400;600;700;800&display=swap" rel="stylesheet">
+</head>
+<body class="min-h-screen">
+
+<!-- HEADER -->
+<div class="bg-[#0b1f3a] text-white px-6 py-4 flex items-center justify-between">
+  <div class="flex items-center gap-3">
+    <div class="w-10 h-10 bg-[#4ad9e8] text-[#0b1f3a] rounded-xl flex items-center justify-center text-xl">🧪</div>
+    <div>
+      <p class="text-xs font-bold tracking-widest text-[#8eeef5] uppercase">HOST PANEL</p>
+      <h1 class="font-extrabold text-lg leading-tight">Polymer Quiz ม.6</h1>
+    </div>
+  </div>
+  <div id="room-badge" class="hidden text-right">
+    <p class="text-xs text-[#8eeef5]">Room Code</p>
+    <p id="room-code-display" class="text-3xl font-black tracking-widest text-[#4ad9e8]"></p>
+  </div>
+</div>
+
+<div class="max-w-3xl mx-auto px-4 py-8 space-y-6">
+
+  <!-- SETUP -->
+  <div id="setup-panel" class="bg-white rounded-3xl shadow-xl p-8">
+    <h2 class="text-2xl font-extrabold text-[#0b1f3a] mb-2">ตั้งค่าเกม</h2>
+    <p class="text-gray-500 mb-6">กำหนดเวลาต่อข้อ แล้วกดสร้างห้อง</p>
+    <label class="block text-sm font-bold text-gray-700 mb-2">⏱ เวลาต่อข้อ</label>
+    <select id="timer-select" class="w-full border-2 border-gray-200 rounded-2xl px-4 py-3 text-lg font-bold focus:outline-none focus:border-[#4ad9e8] mb-6">
+      <option value="10">10 วินาที</option>
+      <option value="20" selected>20 วินาที</option>
+      <option value="30">30 วินาที</option>
+      <option value="45">45 วินาที</option>
+      <option value="60">60 วินาที</option>
+    </select>
+    <button onclick="createRoom()" class="w-full bg-[#0b1f3a] hover:bg-[#1a3a5c] text-white font-extrabold text-xl py-4 rounded-2xl transition">
+      🚀 สร้างห้องเกม
+    </button>
+  </div>
+
+  <!-- ROOM PANEL -->
+  <div id="room-panel" class="hidden space-y-5">
+
+    <!-- Players waiting -->
+    <div class="bg-white rounded-3xl shadow-xl p-6">
+      <div class="flex items-center justify-between mb-4">
+        <h2 class="text-xl font-extrabold text-[#0b1f3a]">ผู้เล่นในห้อง</h2>
+        <span class="bg-[#4ad9e8] text-[#0b1f3a] font-black px-4 py-1 rounded-full text-lg" id="player-count">0</span>
+      </div>
+      <div id="player-list" class="flex flex-wrap gap-2 min-h-[40px]">
+        <span class="text-gray-400 text-sm">รอผู้เล่นเข้าห้อง...</span>
+      </div>
+      <div class="mt-4 p-3 bg-gray-50 rounded-xl">
+        <p class="text-xs text-gray-500 mb-1 font-bold">ลิงก์สำหรับผู้เล่น</p>
+        <a id="play-link" href="#" target="_blank" class="text-[#0b8fa8] text-sm font-medium break-all hover:underline"></a>
+      </div>
+    </div>
+
+    <!-- Controls -->
+    <div class="bg-white rounded-3xl shadow-xl p-6">
+      <div class="flex gap-3 flex-wrap">
+        <button id="start-btn" onclick="startQuestion()" class="flex-1 bg-green-500 hover:bg-green-600 text-white font-extrabold py-4 rounded-2xl text-lg transition">
+          ▶ เริ่มข้อถัดไป
+        </button>
+        <button id="next-btn" onclick="startQuestion()" disabled class="flex-1 bg-[#4ad9e8] hover:bg-[#2cc5d6] text-[#0b1f3a] font-extrabold py-4 rounded-2xl text-lg transition disabled:opacity-40">
+          ⏭ ข้อถัดไป
+        </button>
+        <button onclick="revealAnswer()" class="flex-1 bg-orange-400 hover:bg-orange-500 text-white font-extrabold py-4 rounded-2xl text-lg transition">
+          👁 เฉลย
+        </button>
+        <button onclick="endGame()" class="flex-1 bg-red-500 hover:bg-red-600 text-white font-extrabold py-4 rounded-2xl text-lg transition">
+          🏁 จบเกม
+        </button>
+      </div>
+    </div>
+
+    <!-- Question Panel -->
+    <div id="q-panel" class="hidden bg-white rounded-3xl shadow-xl p-6">
+      <div class="flex items-center justify-between mb-3">
+        <span id="q-number" class="text-sm font-bold text-gray-500"></span>
+        <span id="timer-text" class="text-3xl font-black text-[#0b1f3a]">20</span>
+      </div>
+      <div class="w-full h-3 bg-gray-100 rounded-full mb-4 overflow-hidden">
+        <div id="timer-bar" class="timer-bar h-full bg-[#4ad9e8] rounded-full" style="width:100%"></div>
+      </div>
+      <p id="q-text" class="text-lg font-bold text-[#0b1f3a] mb-4"></p>
+      <div id="q-options" class="space-y-2 mb-4"></div>
+      <p id="answer-count" class="text-sm font-bold text-gray-500 mb-3"></p>
+      <div id="answer-stats"></div>
+    </div>
+
+    <!-- Leaderboard -->
+    <div class="bg-white rounded-3xl shadow-xl p-6">
+      <h2 class="text-xl font-extrabold text-[#0b1f3a] mb-4">🏆 Leaderboard</h2>
+      <div id="leaderboard" class="space-y-2"></div>
+    </div>
+  </div>
+
+  <!-- END PANEL -->
+  <div id="end-panel" class="hidden bg-white rounded-3xl shadow-xl p-8 text-center">
+    <div class="text-6xl mb-4">🎉</div>
+    <h2 class="text-2xl font-extrabold text-[#0b1f3a] mb-2">จบเกมแล้ว!</h2>
+    <p class="text-gray-500 mb-6">ผลคะแนนสุดท้าย</p>
+    <div id="final-leaderboard" class="space-y-2 text-left"></div>
+  </div>
+
+</div>
+
+<script type="module">
+import { getDatabase, ref, onValue } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
+const db = getDatabase();
+// Show room badge when room created
+const observer = new MutationObserver(() => {
+  if (!document.getElementById('room-panel').classList.contains('hidden')) {
+    document.getElementById('room-badge').classList.remove('hidden');
+  }
+});
+observer.observe(document.getElementById('room-panel'), { attributes: true });
+</script>
+</body>
+</html>
